@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# FixVR: Valve Index blank EDID fix installer
+# FixVR: Valve Index blank EDID fix installer (LEGACY FALLBACK)
+#
+# The root cause was fixed upstream in ddcutil 3.0.2, which now ignores the
+# Valve Index by default. Prefer updating libddcutil over installing this rule.
+# https://fixvr.miguvt.com/root-cause
+#
 # https://github.com/miguvt/fixvr
 set -euo pipefail
 
@@ -194,15 +199,51 @@ install_manual() {
 }
 
 # ---------------------------------------------------------------------------
+# Deprecation notice
+# ---------------------------------------------------------------------------
+deprecation_notice() {
+    echo -e "${YELLOW}${BOLD}[!] fixvr is now a LEGACY FALLBACK.${NC}"
+    echo -e "    The root cause was ddcutil probing I2C slave 0x37 and wedging the"
+    echo -e "    headset's EDID EEPROM. It is fixed upstream in ${BOLD}ddcutil 3.0.2${NC},"
+    echo -e "    which now ignores the Valve Index by default."
+    echo
+    echo -e "    Prefer updating ${BOLD}libddcutil${NC} (and restarting powerdevil) over"
+    echo -e "    installing this workaround. This rule reboots the headset at boot"
+    echo -e "    and can interact badly with early-boot software such as Plymouth."
+    echo
+    echo -e "    Read more: ${CYAN}https://fixvr.miguvt.com/root-cause${NC}"
+    echo
+
+    # Require explicit confirmation. If there is no terminal (e.g. unattended
+    # automation), warn and continue so the install still works.
+    if [[ -r /dev/tty ]]; then
+        read -rp "  Install the legacy udev workaround anyway? [y/N] " yn </dev/tty
+        echo
+        case "$yn" in
+            [Yy]*) ;;
+            *)
+                info "Aborted. Update libddcutil to 3.0.2 or newer to fix the root cause."
+                exit 0
+                ;;
+        esac
+    else
+        warn "No terminal available for confirmation; continuing with the legacy install."
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 echo
-echo -e "${BOLD}FixVR: Valve Index blank EDID fix installer${NC}"
+echo -e "${BOLD}FixVR: Valve Index blank EDID fix installer (legacy)${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo
 
 detect_distro
 step "Detected distro: ${BOLD}$DISTRO_ID${NC}${DISTRO_ID_LIKE:+ (like: $DISTRO_ID_LIKE)}"
+echo
+
+deprecation_notice
 echo
 
 if is_nixos; then
@@ -224,5 +265,6 @@ else
 fi
 
 echo
-echo -e "${GREEN}${BOLD}All done.${NC} Your Valve Index blank EDID bug should now be fixed."
+echo -e "${GREEN}${BOLD}All done.${NC} The legacy udev workaround is installed."
+echo -e "Reminder: updating ${BOLD}libddcutil${NC} to 3.0.2+ is the real fix."
 echo

@@ -2,5 +2,14 @@
 # Works around blank EDID bug that makes the kernel see the HMD as a 640x480 monitor.
 # Sends a HID reboot command once per boot when the device is enumerated.
 # /tmp is cleared on boot so the flag resets automatically.
+#
+# DEPRECATED / LEGACY FALLBACK:
+# The root cause was ddcutil/libddcutil probing I2C slave 0x37, which wedged the
+# headset's EDID EEPROM. It is fixed upstream in ddcutil 3.0.2, which ignores the
+# Valve Index by default. Prefer updating libddcutil (and restarting powerdevil)
+# over installing this rule. See https://fixvr.miguvt.com/root-cause
+#
+# This rule reboots the headset at boot and can interact badly with early-boot
+# software (e.g. Plymouth): https://github.com/MiguVT/fixvr/issues/6
 
 KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="28de", ATTRS{idProduct}=="2300", ACTION=="add", RUN+="/bin/sh -c '(sleep 2; test -f /tmp/.valve-index-rebooted || { printf \"\\x16\\x01\" | cat - /dev/zero | head -c 64 > /dev/%k && touch /tmp/.valve-index-rebooted; }) &'"

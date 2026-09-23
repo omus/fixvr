@@ -1,10 +1,75 @@
 # Installation
 
-FixVR ships a single udev rule file (`99-valve-index-reboot.rules`) and a helper install script.  
-Pick the method that matches your distro. 
+::: warning fixvr is now a legacy fallback
+The Valve Index wedge was fixed at its source in **ddcutil 3.0.2**. If you can
+update `libddcutil`, you should **not** need this udev rule. Read
+[The real root cause](/root-cause) first and prefer the root fix below.
+:::
+
+The sections below are ordered from *recommended* to *legacy*. Only use the
+legacy udev rule if you cannot update ddcutil.
 
 
-## Automatic - install script
+## Recommended fix (root cause)
+
+### 1. Update ddcutil / libddcutil to 3.0.2 or newer
+
+ddcutil 3.0.2 ships a built-in ignore list that includes the Valve Index, so it
+no longer probes the headset. This is the real fix and needs no config file.
+
+What matters is the **`libddcutil` shared library**, because that is what KDE
+Plasma's `powerdevil` loads. After updating your distro package, restart
+`powerdevil` (or simply log out and back in) so it picks up the new library.
+
+```bash
+ddcutil --version   # should report 3.0.2 or newer
+```
+
+### 2. Stop the Index waking the system on suspend (optional)
+
+Add this kernel parameter to your bootloader (`grub`, `systemd-boot`, `limine`,
+…):
+
+```
+usbcore.quirks=28de:2613:j
+```
+
+Reboot afterwards. This stops the headset's USB device from waking the machine
+from suspend. A kernel patch is in progress so this will eventually not be
+needed.
+
+### 3. If you cannot update ddcutil
+
+On ddcutil older than 3.0.2, use the `ddcutilrc` config file. `libddcutil` reads
+it, so `powerdevil` honours it after a restart. See the
+[ddcutil configuration docs](https://www.ddcutil.com/config_file/).
+
+```bash
+mkdir -p ~/.config/ddcutil
+cat >~/.config/ddcutil/ddcutilrc <<EOF
+[global]
+options = --ignore-mmid VLV-Index_HMD-37288
+EOF
+```
+
+The flag `--ignore-mmid VLV-Index_HMD-37288` tells ddcutil to skip the Valve
+Index (`VLV` / product `0x91a8`, model `Index HMD`).
+
+
+## Legacy: the fixvr udev rule
+
+::: danger Deprecated workaround
+This rule reboots the headset's HID layer at boot. It treats the symptom, not
+the cause. It can [hang boot under Plymouth](https://github.com/MiguVT/fixvr/issues/6)
+and does **not** run when resuming from suspend
+([issue #2](https://github.com/MiguVT/fixvr/issues/2)). Prefer the root fix
+above.
+:::
+
+FixVR ships a single udev rule file (`99-valve-index-reboot.rules`) and a helper
+install script. Pick the method that matches your distro.
+
+### Automatic - install script
 
 The easiest way on any distro. Run this script:
 
@@ -12,7 +77,8 @@ The easiest way on any distro. Run this script:
 curl -fsSL https://raw.githubusercontent.com/MiguVT/fixvr/main/src/install.sh | bash
 ```
 
-The script auto-detects your distro:
+The script prints a deprecation warning and asks you to confirm before
+installing the legacy rule. It auto-detects your distro:
 
 | Distro family | What happens |
 |---|---|
@@ -22,8 +88,7 @@ The script auto-detects your distro:
 
 > **AUR helper** — If neither `paru` nor `yay` is found, the script will offer to install paru for you.
 
-
-## Arch-based (AUR)
+### Arch-based (AUR)
 
 Install with your preferred AUR helper:
 
@@ -39,8 +104,7 @@ yay -S fixvr-git
 
 :::
 
-
-## NixOS
+### NixOS
 
 NixOS manages udev rules declaratively. Add the following to your system configuration (e.g. `configuration.nix` or a dedicated module):
 
@@ -146,8 +210,7 @@ Then rebuild:
 sudo nixos-rebuild switch
 ```
 
-
-## Manual (all distros)
+### Manual (all distros)
 
 Download and install the rule file, then reload udev:
 
@@ -158,10 +221,12 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger --action=add --subsystem-match=hidraw
 ```
 
-Reconnect your Valve Index — the fix is now active.
+Reconnect your Valve Index — the legacy rule is now active.
 
 
 ## Uninstall
+
+If you installed fixvr and later fixed the root cause, remove the legacy rule:
 
 ```bash
 sudo rm /etc/udev/rules.d/99-valve-index-reboot.rules
@@ -176,8 +241,14 @@ paru -R fixvr-git   # or: yay -R fixvr-git
 
 On NixOS, remove the `services.udev.extraRules` block and run `sudo nixos-rebuild switch`.
 
+On any distro, you can also undo the older workarounds:
 
-## How it works
+```bash
+rm -f ~/.config/ddcutil/ddcutilrc   # only needed on ddcutil < 3.0.2
+```
+
+
+## How the legacy rule works
 
 The udev rule matches the Valve Index HMD by its USB vendor/product ID (`28de:2300`). On the `add` event — i.e. each time the device is enumerated — it fires a backgrounded shell one-liner:
 
@@ -189,10 +260,25 @@ The udev rule matches the Valve Index HMD by its USB vendor/product ID (`28de:23
 
 Because `/tmp` is cleared every boot, the flag is always absent on the first plug-in of each session, and always present for subsequent plug-ins, preventing double-reboots.
 
+This is a software workaround for a problem that is now fixed upstream. See
+[The real root cause](/root-cause) for why it was ever necessary.
+
 
 ## Troubleshooting
 
-### The fix doesn't seem to apply on boot
+### I updated ddcutil but the headset still wedges
+
+Make sure the **library** `powerdevil` actually loads is new enough, then
+restart `powerdevil` (or log out/in). Check with:
+
+```bash
+ddcutil --version
+ldconfig -p | grep ddcutil
+```
+
+The Index should no longer show up in `ddcutil detect`.
+
+### The legacy fix doesn't seem to apply on boot
 
 Make sure the rule file is installed and udev has been reloaded:
 
@@ -214,4 +300,4 @@ If the flag file exists, the rule fired successfully.
 
 ### The flag file exists but the headset still shows as 640×480
 
-This sometimes happens if the timing is tight. Try increasing the sleep value in the rule from `2` to `5` and rebooting.
+This sometimes happens if the timing is tight. Try increasing the sleep value in the rule from `2` to `5` and rebooting. Better yet, fix the root cause instead — see [The real root cause](/root-cause).

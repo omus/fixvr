@@ -65,27 +65,13 @@ ddcutil --version
 ```
 
 Then restart `powerdevil` (or log out/in) so it picks up the new library. The
-Valve Index should no longer appear in `ddcutil detect` output.
+Valve Index should now be ignored by `libddcutil`.
 
-### 2. (Optional) stop the Index waking the system on suspend
-
-Separate from the EDID wedge, the headset can wake the machine from suspend.
-Tell the kernel to ignore its remote-wakeup capability by adding this kernel
-parameter:
-
-```
-usbcore.quirks=28de:2613:j
-```
-
-Add it to your bootloader's kernel command line (`grub`/`systemd-boot`/
-`limine`/etc.) and reboot. @omus is working on a [kernel patch](https://lore.kernel.org/all/20260924034200.421686-1-curtis.vogt@gmail.com/T/#u)
-so this will eventually no longer be needed either.
-
-### 3. Only if you cannot update ddcutil
+### 2. Manually configure ddcutil ignore rules (if you cannot update ddcutil)
 
 On ddcutil versions older than `3.0.2`, tell the library to ignore the headset
-through the `ddcutilrc` config file. `libddcutil` reads this, so `powerdevil`
-honours it after a restart:
+through the [`ddcutilrc` config file](https://www.ddcutil.com/config_file/).
+`libddcutil` reads this, so `powerdevil` honours it after a restart:
 
 ```bash
 mkdir -p ~/.config/ddcutil
@@ -95,8 +81,10 @@ options = --ignore-mmid VLV-Index_HMD-37288
 EOF
 ```
 
-To verify that `ddcutil` is ignoring your headset run `ddcutil detect` with the
-headset plugged in and you should see output similar to:
+### 3. Verify ddcutil is ignoring your headset
+
+Run `ddcutil detect` with the headset plugged in to verify the ignore rule is
+working. Find the entry for the Valve Index which should look similar to:
 
 ```
 DDC_disabled
@@ -112,16 +100,30 @@ DDC_disabled
    DDC communication disabled
 ```
 
-If you see either "DDC communication failed" or "I2C slave address x37 is
-unresponsive" instead of "DDC communication disabled" (as shown above) your
-ignore rule doesn't match your headset. Unfortunately, if this occurs your
-headset is now wedged and you'll need to reboot it in order to make it functional
-again. To fix the ignore rule use the "Mfg id", "Model", and "Product" shown in
-the `ddcutil detect` output and update the `--ignore-mmid` value in
-`~/.config/ddcutil/ddcutilrc` with your headsets details. Additionally, [comment
-on this issue](https://github.com/rockowitz/ddcutil/issues/632) with your
-headset's `--ignore-mmid` value so we can update `ddcutil` to ignore it by
-default.
+If the output for `ddcutil detect` says "Invalid display" instead of
+"DDC_disabled" as shown in the example then the ignore rule didn't work for
+your exact model. To fix the ignore rule follow the steps in
+["Manually configure ddcutil ignore rules"](#2-manually-configure-ddcutil-ignore-rules-if-you-cannot-update-ddcutil)
+and update the `--ignore-mmid` to use the "Mfg id", "Model", and
+"Product" shown in the `ddcutil dectect` output with your headsets details.
+
+Additionally, [comment on this issue](https://github.com/rockowitz/ddcutil/issues/632)
+with your headset's `--ignore-mmid` value so we can update `ddcutil` to ignore
+your model by default.
+
+### 4. (Optional) Stop the Index waking the system on suspend
+
+Separate from the EDID wedge, the headset can wake the machine from suspend.
+Tell the kernel to ignore its remote-wakeup capability by adding this kernel
+parameter:
+
+```
+usbcore.quirks=28de:2613:j
+```
+
+Add it to your bootloader's kernel command line (`grub`/`systemd-boot`/
+`limine`/etc.) and reboot. @omus is working on a [kernel patch](https://lore.kernel.org/all/20260924034200.421686-1-curtis.vogt@gmail.com/T/#u)
+so this will eventually no longer be needed either.
 
 ## Do I still need fixvr?
 

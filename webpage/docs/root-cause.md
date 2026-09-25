@@ -78,8 +78,8 @@ usbcore.quirks=28de:2613:j
 ```
 
 Add it to your bootloader's kernel command line (`grub`/`systemd-boot`/
-`limine`/etc.) and reboot. `@omus` is working on a kernel patch so this will
-eventually no longer be needed either.
+`limine`/etc.) and reboot. @omus is working on a [kernel patch](https://lore.kernel.org/all/20260924034200.421686-1-curtis.vogt@gmail.com/T/#u)
+so this will eventually no longer be needed either.
 
 ### 3. Only if you cannot update ddcutil
 
@@ -94,6 +94,34 @@ cat >~/.config/ddcutil/ddcutilrc <<EOF
 options = --ignore-mmid VLV-Index_HMD-37288
 EOF
 ```
+
+To verify that `ddcutil` is ignoring your headset run `ddcutil detect` with the
+headset plugged in and you should see output similar to:
+
+```
+DDC_disabled
+   I2C bus:  /dev/i2c-6
+   DRM_connector:           card0-DP-1
+   EDID synopsis:
+      Mfg id:               VLV - Valve Corporation
+      Model:                Index HMD
+      Product code:         37288  (0x91a8)
+      Serial number:
+      Binary serial number: 4294967295 (0xffffffff)
+      Model year:           2018
+   DDC communication disabled
+```
+
+If you see either "DDC communication failed" or "I2C slave address x37 is
+unresponsive" instead of "DDC communication disabled" (as shown above) your
+ignore rule doesn't match your headset. Unfortunately, if this occurs your
+headset is now wedged and you'll need to reboot it in order to make it functional
+again. To fix the ignore rule use the "Mfg id", "Model", and "Product" shown in
+the `ddcutil detect` output and update the `--ignore-mmid` value in
+`~/.config/ddcutil/ddcutilrc` with your headsets details. Additionally, [comment
+on this issue](https://github.com/rockowitz/ddcutil/issues/632) with your
+headset's `--ignore-mmid` value so we can update `ddcutil` to ignore it by
+default.
 
 ## Do I still need fixvr?
 
